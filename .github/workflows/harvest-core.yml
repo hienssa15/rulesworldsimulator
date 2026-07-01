@@ -117,7 +117,7 @@ jobs:
   # ============================================================
   # JOB 1C: Scrape Project Rho (~3 phút)
   # ============================================================
-    scrape-project-rho:
+  scrape-project-rho:
     if: ${{ !inputs.skip_scrape }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
