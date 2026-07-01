@@ -10,7 +10,6 @@ import hashlib
 import logging
 from datetime import datetime, timezone
 from urllib.parse import quote_plus
-from pymongo import MongoClient
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -25,20 +24,35 @@ class T0Search:
             "Accept-Language": "en-US,en;q=0.5",
         })
         
+        # Handle MongoDB connection với try-catch
+        self.mongo = None
+        self.db = None
+        
         if settings.MONGODB_URI:
-            self.mongo = MongoClient(settings.MONGODB_URI)
-            self.db = self.mongo[settings.MONGODB_DB_NAME]
-        else:
-            self.mongo = None
-            self.db = None
+            try:
+                from pymongo import MongoClient
+                self.mongo = MongoClient(settings.MONGODB_URI, serverSelectionTimeoutMS=5000)
+                # Test connection
+                self.mongo.admin.command('ping')
+                self.db = self.mongo[settings.MONGODB_DB_NAME]
+                logger.info("✅ MongoDB connected successfully")
+            except Exception as e:
+                logger.warning(f"⚠️  MongoDB connection failed: {e}")
+                logger.warning("   Pipeline will continue without MongoDB")
+                self.mongo = None
+                self.db = None
 
     def get_used_keywords(self) -> list[str]:
         """Lấy danh sách từ khóa đã dùng từ MongoDB"""
         if not self.db:
             return []
         
-        keywords = list(self.db[settings.MONGODB_COLLECTION_KEYWORDS].find())
-        return [kw["keyword"] for kw in keywords]
+        try:
+            keywords = list(self.db[settings.MONGODB_COLLECTION_KEYWORDS].find())
+            return [kw["keyword"] for kw in keywords]
+        except Exception as e:
+            logger.warning(f"Không thể đọc keywords từ MongoDB: {e}")
+            return []
 
     def generate_keywords_with_llm(self, count: int = 5) -> list[str]:
         """Dùng LLM sinh từ khóa mới, không lặp lại"""
@@ -103,6 +117,107 @@ Output: JSON array, ví dụ: ["keyword 1", "keyword 2", ...]
 
     def search_startpage(self, keyword: str) -> list[dict]:
         """Search trên Startpage, trả về danh sách links"""
+        data = {"query": keyword, "cat": "web"}
+        
+        try:
+            resp = self.session.post(
+                settings.SEARCH_URL,
+                data=data,
+                timeout=20
+            )
+            resp.raise_for_status()
+            
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(resp.text, "lxml")
+            
+            links = []
+            for a in soup.find_all("a", class_="w-gl__result-url"):
+                href = a.get("href", "")
+                if href.startswith("http"):
+                    links.append({
+                        "url": href,
+                        "title": a.get_text(strip=True),
+                        "keyword": keyword,
+                        "searched_at": datetime.now(timezone.utc).isoformat()
+                    })
+            
+            # Fallback nếu không tìm thấy class cụ thể
+            if not links:
+                for a in soup.find_all("a", href=True):
+                    href = a["href"]
+                    if href.startswith("http") and "startpage.com" not in href:
+                        links.append({
+                            "url": href,
+                            "title": a.get_text(strip=True)[:100],
+                            "keyword": keyword,
+                            "searched_at": datetime.now(timezone.utc).isoformat()
+                        })
+            
+            return links[:settings.MAX_RESULTS_PER_SEARCH]
+            
+        except Exception as e:
+            logger.error(f"Lỗi search '{keyword}': {e}")
+            return []
+
+    def save_keywords(self, keywords: list[str], run_id: str):
+        """Lưu từ khóa đã dùng vào MongoDB"""
+        if not self.db:
+            return
+        
+        try:
+            for kw in keywords:
+                self.db[settings.MONGODB_COLLECTION_KEYWORDS].insert_one({
+                    "keyword": kw,
+                    "normalized": self._normalize_keyword(kw),
+                    "used_at": datetime.now(timezone.utc).isoformat(),
+                    "run_id": run_id
+                })
+        except Exception as e:
+            logger.warning(f"Không thể lưu keywords vào MongoDB: {e}")
+
+    def _normalize_keyword(self, kw: str) -> str:
+        """Chuẩn hóa từ khóa để so sánh"""
+        kw = kw.lower()
+        kw = re.sub(r'[^a-z0-9\s]', '', kw)
+        words = sorted(kw.split())
+        return ' '.join(words)
+
+    def run(self, run_id: str) -> list[dict]:
+        """
+        Chạy T0: sinh từ khóa + search
+        Trả về danh sách links (tối đa LINKS_PER_RUN)
+        """
+        logger.info("=" * 80)
+        logger.info("🔍 T0: SEARCH ENGINE")
+        logger.info("=" * 80)
+        
+        # Sinh từ khóa
+        keywords = self.generate_keywords_with_llm(count=5)
+        logger.info(f"✅ Sinh được {len(keywords)} từ khóa:")
+        for i, kw in enumerate(keywords, 1):
+            logger.info(f"   {i}. {kw}")
+        
+        # Lưu từ khóa
+        self.save_keywords(keywords, run_id)
+        
+        # Search từng từ khóa
+        all_links = []
+        for keyword in keywords:
+            logger.info(f"\n🔎 Searching: {keyword}")
+            links = self.search_startpage(keyword)
+            logger.info(f"   ✅ Tìm được {len(links)} links")
+            all_links.extend(links)
+            time.sleep(settings.SEARCH_DELAY_SECONDS)
+            
+            if len(all_links) >= settings.LINKS_PER_RUN:
+                break
+        
+        # Giới hạn số links
+        all_links = all_links[:settings.LINKS_PER_RUN]
+        
+        logger.info(f"\n📊 TỔNG: {len(all_links)} links")
+        
+        return all_links        """Search trên Startpage, trả về danh sách links"""
         data = {"query": keyword, "cat": "web"}
         
         try:
