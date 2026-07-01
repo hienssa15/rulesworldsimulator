@@ -1,86 +1,68 @@
 import os
 
 # ============================================================
-# GEMINI API KEYS - Xoay vòng round-robin
+# GEMINI API - Chỉ dùng 1 key để sinh từ khóa
 # ============================================================
-GEMINI_KEYS = [k for k in [
-    os.getenv("GEMINI_KEY_1", ""),
-    os.getenv("GEMINI_KEY_2", ""),
-    os.getenv("GEMINI_KEY_3", ""),
-    os.getenv("GEMINI_KEY_4", ""),
-    os.getenv("GEMINI_KEY_5", ""),
-    os.getenv("GEMINI_KEY_6", ""),
-    os.getenv("GEMINI_KEY_7", ""),
-] if k.strip()]
-
+GEMINI_KEY = os.getenv("GEMINI_KEY_1", "").strip()
 GEMINI_MODEL = "gemini-2.5-flash"
 
 # ============================================================
-# MONGODB ATLAS
+# MONGODB ATLAS - ĐÃ SỬA: strip whitespace
 # ============================================================
-MONGODB_URI = os.getenv("MONGODB_URI", "")
+MONGODB_URI = os.getenv("MONGODB_URI", "").strip()
 MONGODB_DB_NAME = "world_lore_db"
+
+# Collections
+MONGODB_COLLECTION_KEYWORDS = "used_keywords"
+MONGODB_COLLECTION_LINKS = "scraped_links"
+MONGODB_COLLECTION_CONTENT = "raw_content"
 MONGODB_COLLECTION_RULES = "biology_rules"
-MONGODB_COLLECTION_SNAPSHOT = "harvest_snapshot"
-MONGODB_COLLECTION_STATE = "harvest_state"
+MONGODB_COLLECTION_RUNS = "run_logs"
 
 # ============================================================
-# SCRAPE SOURCES - ĐÃ SỬA THEO DEBUG RADAR
+# SEARCH ENGINE - STARTPAGE (đã test và xác nhận)
 # ============================================================
+SEARCH_ENGINE = "startpage"
+SEARCH_URL = "https://www.startpage.com/do/dsearch"
+MAX_RESULTS_PER_SEARCH = 20
+SEARCH_DELAY_SECONDS = 2.0
 
-# Orion's Arm: Site đã chuyển sang CMS mới (SPA), cần Playwright
-ORIONS_ARM_BASE = "https://www.orionsarm.com"
-ORIONS_ARM_ENCYCLOPEDIA = "https://www.orionsarm.com/encyclopedia"
+# ============================================================
+# PIPELINE SETTINGS
+# ============================================================
+LINKS_PER_RUN = 20              # 20 links/phiên
+MIN_CONTENT_LENGTH = 500        # Ít nhất 500 ký tự
+MIN_BIOLOGY_KEYWORDS = 3        # Ít nhất 3 từ khóa sinh học
 
-# Speculative Evolution: Fandom API VẪN HOẠT ĐỘNG (đã xác nhận qua debug)
-SPEC_EVO_API = "https://speculativeevolution.fandom.com/api.php"
-SPEC_EVO_CATEGORIES = [
-    "Species",
-    "Creatures",
-    "Organisms",
-    "Animals",
-    "Plants",
-    "Alien_life",
-    "Biology",
-    "Ecosystems",
-]
-
-# Project Rho: ĐÃ SỬA .html sang .php (đã xác nhận qua debug)
-PROJECT_RHO_BASE = "https://www.projectrho.com/public_html/rocket/"
-PROJECT_RHO_PAGES = [
-    "aliens.php",
-    "alienbiology.php",
-    "exoticbiology.php",
-    "nonhuman.php",
+# ============================================================
+# BIOLOGY KEYWORDS (để validate content)
+# ============================================================
+BIOLOGY_KEYWORDS = [
+    "silicon", "carbon", "ammonia", "methane",
+    "biochemistry", "organism", "metabolism",
+    "solvent", "extremophile", "alternative life",
+    "base element", "respiration", "photosynthesis",
+    "chemosynthesis", "anaerobic", "extreme environment"
 ]
 
 # ============================================================
-# SCRAPE SETTINGS
+# TOPIC TREE (để LLM sinh từ khóa đa dạng)
 # ============================================================
-REQUEST_DELAY_SECONDS = 1.5
-MAX_ARTICLES_PER_CATEGORY = 200
-MAX_ARTICLES_TOTAL = 1500
+TOPIC_TREE = {
+    "base_elements": ["silicon", "boron", "arsenic", "sulfur", "phosphorus"],
+    "solvents": ["ammonia", "methane", "sulfuric acid", "hydrogen fluoride", "liquid nitrogen"],
+    "environments": [
+        "high pressure", "extreme cold", "extreme heat", "vacuum",
+        "acidic", "alkaline", "radiation", "deep ocean", "volcanic"
+    ],
+    "metabolism": [
+        "anaerobic", "chemosynthesis", "radiosynthesis", "methanogenesis",
+        "sulfur metabolism", "iron metabolism"
+    ]
+}
 
 # ============================================================
-# BATCH / RATE LIMIT
+# RUN SETTINGS
 # ============================================================
-ARTICLES_PER_BATCH = 15
-DELAY_BETWEEN_CALLS_SEC = 4.0
-RETRY_WAIT_SEC = 60
-
-# ============================================================
-# QUALITY / OUTPUT
-# ============================================================
-MIN_QUALITY_SCORE = 0.55
-MAX_FINAL_RULES = 500
-
-# ============================================================
-# SNAPSHOT KEY trong MongoDB
-# ============================================================
-SNAPSHOT_DOC_ID = "world_lore_master"
-
-# ============================================================
-# PLAYWRIGHT SETTINGS (cho Orion's Arm)
-# ============================================================
-PLAYWRIGHT_TIMEOUT = 30000
-PLAYWRIGHT_HEADLESS = True
+RUN_TIMEOUT_MINUTES = 25        # Giới hạn 25 phút/phiên
+DELAY_BETWEEN_REQUESTS = 1.5    # Delay giữa các request
