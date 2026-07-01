@@ -1,36 +1,12 @@
-name: Test Scrape (Kiểm tra scraper)
-
-# ============================================================
-# TEST WORKFLOW - Chạy thủ công để kiểm tra scraper
-# ============================================================
-# Mục đích: Kiểm tra xem scraper có hoạt động không trước khi
-# lắp vào pipeline chính. Không dùng LLM, không dùng MongoDB.
-#
-# Cách chạy:
-#   GitHub → Actions → "Test Scrape" → Run workflow
-#   → Chọn nguồn cần test (hoặc "all")
-#   → Chờ 5-15 phút
-#   → Download artifact để xem kết quả
-# ============================================================
+concurrency: name: Debug Sources (Khảo sát địa hình)
 
 on:
-  workflow_dispatch:
-    inputs:
-      source:
-        description: 'Nguồn cần test'
-        required: true
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - orions
-          - spec_evo
-          - project_rho
+  workflow_dispatch: {}
 
 jobs:
-  test:
+  debug:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     
     steps:
       - name: Checkout code
@@ -40,42 +16,22 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install requests
+        run: pip install requests
 
-      - name: Run test scrape
+      - name: Chạy Radar Debug
+        run: python debug_sources.py
+
+      - name: In kết quả ra log
         run: |
-          if [ "${{ inputs.source }}" = "all" ]; then
-            python test_scrape.py all
-          else
-            python test_scrape.py ${{ inputs.source }}
-          fi
+          echo "=== NỘI DUNG debug_results.json ==="
+          cat debug_results.json
 
-      - name: Upload test results
+      - name: Upload kết quả
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results-${{ github.run_id }}
-          path: test_output/
+          name: debug-results-${{ github.run_id }}
+          path: debug_results.json
           retention-days: 7
-
-      - name: Summary
-        if: always()
-        run: |
-          echo "## 📊 Test Scrape Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Source: ${{ inputs.source }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Run ID: ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Timestamp: $(date -u)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -f test_output/test_summary_*.json ]; then
-            echo "### Kết quả:" >> $GITHUB_STEP_SUMMARY
-            echo '```json' >> $GITHUB_STEP_SUMMARY
-            cat test_output/test_summary_*.json >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "⚠️ Không có kết quả test" >> $GITHUB_STEP_SUMMARY
-          fi
