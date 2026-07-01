@@ -1,9 +1,18 @@
-# World Lore Harvester - dependencies
-requests==2.32.3
-beautifulsoup4==4.12.3
-lxml==5.2.2
-pymongo==4.8.0
-dnspython==2.6.1
-tzdata==2024.1
+# Core
+httpx>=0.25.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
 
-# ĐÃ BỎ: google-generativeai (không dùng LLM nữa)
+# Optional: Playwright (cho SPA sites)
+playwright>=1.40.0
+
+# Optional: PDF extraction
+pdfplumber>=0.10.0
+
+# Optional: MongoDB
+pymongo>=4.6.0
+
+# Optional: Better content extraction
+trafilatura>=1.6.0
+readability-lxml>=0.8.1
+newspaper3k>=0.2.8
