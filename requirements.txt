@@ -3,8 +3,6 @@ requests==2.32.3
 beautifulsoup4==4.12.3
 lxml==5.2.2
 pymongo==4.8.0
+dnspython==2.6.1  # Cần cho MongoDB SRV URI
 google-generativeai==0.8.5
 tzdata==2024.1
-
-# Playwright cho Orion's Arm (site đã chuyển sang SPA/CMS mới)
-playwright==1.45.0
