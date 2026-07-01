@@ -31,7 +31,7 @@ on:
       MONGODB_URI:
         required: true
 
-# Ngăn 2 workflow (initial / monthly) chạy cùng lúc (tránh conflict MongoDB)
+# Ngăn 2 workflow (initial / monthly) chạy cùng lúc — tránh conflict MongoDB
 concurrency:
   group: harvest-world-lore
   cancel-in-progress: false
@@ -132,12 +132,6 @@ jobs:
       - name: Cài dependencies
         run: pip install -r requirements.txt
 
-      # THÊM 2 DÒNG NÀY:
-      - name: Cài Playwright browsers
-        run: |
-          playwright install chromium
-          playwright install-deps chromium
-
       - name: Scrape Project Rho
         env:
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
@@ -188,25 +182,28 @@ jobs:
       - name: Flatten raw files vào data/
         run: |
           mkdir -p data
-          mkdir -p data/raw-dl
           find data/raw-dl -name "raw_*.json" -exec mv {} data/ \; 2>/dev/null || true
           find data/raw-dl -name "incr_*.json" -exec mv {} data/ \; 2>/dev/null || true
+          echo "=== Files trong data/ ==="
           ls -la data/raw_*.json data/incr_*.json 2>/dev/null || echo "CẢNH BÁO: Không có raw/incr file!"
 
       - name: Tính số batches
         id: plan
         run: |
-          if [ "${{ inputs.mode }}" = "incremental" ]; then PREFIX=incr; else PREFIX=raw; fi
+          if [ "${{ inputs.mode }}" = "incremental" ]; then
+            PREFIX=incr
+          else
+            PREFIX=raw
+          fi
           output=$(python main.py --count-batches --prefix $PREFIX)
           echo "$output"
           n=$(echo "$output" | grep N_BATCHES | cut -d= -f2)
-          echo "n_batches=$n" >> $GITHUB_OUTPUT
-          # Tạo JSON array: [0, 1, 2, ..., n-1]
+          echo "n_batches=$n" >> "$GITHUB_OUTPUT"
           ids=$(python3 -c "import json; print(json.dumps(list(range($n))))")
-          echo "batch_ids=$ids" >> $GITHUB_OUTPUT
+          echo "batch_ids=$ids" >> "$GITHUB_OUTPUT"
 
   # ============================================================
-  # JOB 3: LLM Extraction - matrix song song (tối đa 20 jobs đồng thời)
+  # JOB 3: LLM Extraction - matrix song song
   # Mỗi job xử lý 15 articles, chạy ≤ 25 phút với 7 key xoay vòng
   # ============================================================
   extract-batch:
@@ -238,7 +235,6 @@ jobs:
       - name: Flatten raw files vào data/
         run: |
           mkdir -p data
-          mkdir -p data/raw-dl
           find data/raw-dl -name "raw_*.json" -exec mv {} data/ \; 2>/dev/null || true
           find data/raw-dl -name "incr_*.json" -exec mv {} data/ \; 2>/dev/null || true
           ls -la data/raw_*.json data/incr_*.json 2>/dev/null || echo "CẢNH BÁO: Không có raw/incr file!"
@@ -253,7 +249,11 @@ jobs:
           GEMINI_KEY_6: ${{ secrets.GEMINI_KEY_6 }}
           GEMINI_KEY_7: ${{ secrets.GEMINI_KEY_7 }}
         run: |
-          if [ "${{ inputs.mode }}" = "incremental" ]; then PREFIX=incr; else PREFIX=raw; fi
+          if [ "${{ inputs.mode }}" = "incremental" ]; then
+            PREFIX=incr
+          else
+            PREFIX=raw
+          fi
           python main.py --extract-batch ${{ matrix.batch_id }} --prefix $PREFIX
 
       - name: Upload batch result
@@ -291,7 +291,6 @@ jobs:
       - name: Flatten batch files vào data/
         run: |
           mkdir -p data
-          mkdir -p data/batches-raw
           find data/batches-raw -name "extracted_batch_*.json" -exec mv {} data/ \; 2>/dev/null || true
           echo "=== Files trong data/ ==="
           ls -la data/extracted_batch_*.json 2>/dev/null || echo "CẢNH BÁO: Không tìm thấy file!"
@@ -305,8 +304,6 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           if [ "${{ inputs.mode }}" = "incremental" ]; then
-            # Phần 2: vẫn chạy finalize dù n_files=0, để cập nhật last_refresh_at
-            # (cmd_finalize tự xử lý trường hợp 0 rule khi có --update-state)
             if [ "$n_files" = "0" ]; then
               echo "[]" > data/extracted_batch_0.json
             fi
@@ -314,7 +311,7 @@ jobs:
           elif [ "$n_files" != "0" ]; then
             python main.py --finalize
           else
-            echo "⚠️ Không có extracted batch nào — bỏ qua finalize (Phần 1 không có gì để upload)." >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ Không có extracted batch nào — bỏ qua finalize (Phần 1 không có gì để upload)." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload JSON master (artifact backup)
@@ -328,13 +325,13 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          echo "## ✅ Harvest Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- Run ID: ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Timestamp: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Harvest Complete" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Run ID: ${{ github.run_id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Timestamp: $(date -u)" >> "$GITHUB_STEP_SUMMARY"
           if [ -f data/biology_rules_final.json ]; then
             rules=$(python3 -c "import json; d=json.load(open('data/biology_rules_final.json')); print(d['metadata']['total_rules'])")
-            echo "- Rules this run: $rules" >> $GITHUB_STEP_SUMMARY
+            echo "- Rules this run: $rules" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "- ⚠️ biology_rules_final.json không tồn tại" >> $GITHUB_STEP_SUMMARY
+            echo "- ⚠️ biology_rules_final.json không tồn tại" >> "$GITHUB_STEP_SUMMARY"
           fi
