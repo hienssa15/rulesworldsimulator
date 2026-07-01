@@ -31,7 +31,7 @@ class T5Upload:
         logger.info("📤 T5: UPLOAD MONGODB")
         logger.info("=" * 80)
         
-        if not self.db:
+        if self.db is None:
             logger.warning("Không có MongoDB, bỏ qua upload")
             return
         
@@ -52,7 +52,7 @@ class T5Upload:
 
     def save_run_log(self, run_id: str, stats: dict):
         """Lưu log của run"""
-        if not self.db:
+        if self.db is None:
             return
         
         try:
