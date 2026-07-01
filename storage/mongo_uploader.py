@@ -165,6 +165,43 @@ class MongoUploader:
         return set()
 
     # ------------------------------------------------------------------
+    # PHẦN 2: State cho monthly refresh — mốc thời gian + hash trang tĩnh
+    # ------------------------------------------------------------------
+
+    def get_last_refresh_timestamp(self) -> str:
+        """
+        Trả về ISO timestamp của lần refresh (Phần 2) thành công gần nhất.
+        Nếu chưa từng chạy Phần 2, trả về thời điểm rất xa trong quá khứ
+        để lần đầu tiên coi mọi bài viết là 'mới'.
+        """
+        doc = self.state_col.find_one({"state_id": "harvest_progress"})
+        if doc and doc.get("last_refresh_at"):
+            return doc["last_refresh_at"]
+        return "2000-01-01T00:00:00Z"
+
+    def set_last_refresh_timestamp(self, iso_ts: str):
+        self.state_col.update_one(
+            {"state_id": "harvest_progress"},
+            {"$set": {"last_refresh_at": iso_ts}},
+            upsert=True,
+        )
+        logger.info(f"Đã cập nhật last_refresh_at = {iso_ts}")
+
+    def get_page_hashes(self) -> dict:
+        """Hash nội dung các trang Project Rho từ lần cào trước."""
+        doc = self.state_col.find_one({"state_id": "harvest_progress"})
+        if doc:
+            return doc.get("project_rho_hashes", {})
+        return {}
+
+    def set_page_hashes(self, hashes: dict):
+        self.state_col.update_one(
+            {"state_id": "harvest_progress"},
+            {"$set": {"project_rho_hashes": hashes}},
+            upsert=True,
+        )
+
+    # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
