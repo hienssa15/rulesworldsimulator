@@ -44,7 +44,7 @@ class T0Search:
 
     def get_used_keywords(self) -> list[str]:
         """Lấy danh sách từ khóa đã dùng từ MongoDB"""
-        if not self.db:
+        if self.db is None:
             return []
         
         try:
@@ -161,7 +161,7 @@ Output: JSON array, ví dụ: ["keyword 1", "keyword 2", ...]
 
     def save_keywords(self, keywords: list[str], run_id: str):
         """Lưu từ khóa đã dùng vào MongoDB"""
-        if not self.db:
+        if self.db is None:
             return
         
         try:
