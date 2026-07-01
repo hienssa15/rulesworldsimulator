@@ -1,9 +1,10 @@
 import os
 
 # ============================================
-# GEMINI API KEYS - 7 keys xoay vòng
+# GEMINI API KEYS - Xoay vòng round-robin
+# Dùng gemini-2.5-flash (free tier hiện tại)
 # ============================================
-GEMINI_KEYS = [
+GEMINI_KEYS = [k for k in [
     os.getenv("GEMINI_KEY_1", ""),
     os.getenv("GEMINI_KEY_2", ""),
     os.getenv("GEMINI_KEY_3", ""),
@@ -11,18 +12,19 @@ GEMINI_KEYS = [
     os.getenv("GEMINI_KEY_5", ""),
     os.getenv("GEMINI_KEY_6", ""),
     os.getenv("GEMINI_KEY_7", ""),
-]
+] if k.strip()]
 
-GEMINI_MODEL = "gemini-2.0-flash"
-GEMINI_MODEL_HEAVY = "gemini-2.0-pro-exp-02-05"
+# gemini-2.5-flash là model free tier ổn định nhất hiện tại
+GEMINI_MODEL = "gemini-2.5-flash"
 
 # ============================================
 # MONGODB ATLAS
 # ============================================
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb+srv://user:pass@cluster.mongodb.net/")
+MONGODB_URI = os.getenv("MONGODB_URI", "")
 MONGODB_DB_NAME = "world_lore_db"
 MONGODB_COLLECTION_RULES = "biology_rules"
-MONGODB_COLLECTION_RAW = "raw_articles"
+MONGODB_COLLECTION_SNAPSHOT = "harvest_snapshot"
+MONGODB_COLLECTION_STATE = "harvest_state"
 
 # ============================================
 # SCRAPE SOURCES
@@ -58,9 +60,22 @@ MAX_ARTICLES_PER_CATEGORY = 200
 MAX_ARTICLES_TOTAL = 1500
 
 # ============================================
-# OUTPUT
+# BATCH / RATE LIMIT
+# Mỗi job GitHub Actions chạy tối đa 25 phút
+# ARTICLES_PER_BATCH nhỏ để xoay key không bị 429
 # ============================================
-RAW_OUTPUT_PATH = "data/raw_articles.json"
-FINAL_OUTPUT_PATH = "data/biology_rules_final.json"
-MIN_QUALITY_SCORE = 0.6
-MAX_FINAL_RULES = 300
+ARTICLES_PER_BATCH = 15          # số article mỗi batch LLM
+DELAY_BETWEEN_CALLS_SEC = 4.0    # delay giữa 2 lần gọi Gemini
+RETRY_WAIT_SEC = 60              # chờ khi tất cả key bị rate limit
+
+# ============================================
+# QUALITY / OUTPUT
+# ============================================
+MIN_QUALITY_SCORE = 0.55
+MAX_FINAL_RULES = 500
+
+# ============================================
+# SNAPSHOT KEY trong MongoDB
+# Toàn bộ dữ liệu gói vào 1 document duy nhất
+# ============================================
+SNAPSHOT_DOC_ID = "world_lore_master"
