@@ -177,16 +177,30 @@ def cmd_finalize():
     ])
 
     if not batch_files:
-        logger.error("Không tìm thấy file extracted_batch_*.json")
+        logger.error(
+            "Không tìm thấy file extracted_batch_*.json trong thư mục data/\n"
+            f"  Nội dung data/: {os.listdir(DATA_DIR) if os.path.exists(DATA_DIR) else 'KHÔNG TỒN TẠI'}"
+        )
         sys.exit(1)
 
     for filename in batch_files:
         filepath = os.path.join(DATA_DIR, filename)
-        with open(filepath, "r", encoding="utf-8") as f:
-            rules = json.load(f)
-            all_rules.extend(rules)
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                rules = json.load(f)
+                if isinstance(rules, list):
+                    all_rules.extend(rules)
+                    logger.debug(f"  {filename}: {len(rules)} rules")
+                else:
+                    logger.warning(f"  {filename}: format không hợp lệ, bỏ qua")
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"  {filename}: lỗi đọc file — {e}, bỏ qua")
 
-    logger.info(f"Tổng rules từ {len(batch_files)} batches: {len(all_rules)}")
+    logger.info(f"Tổng rules từ {len(batch_files)} batch files: {len(all_rules)}")
+
+    if len(all_rules) == 0:
+        logger.error("Không có rule nào được extract — kiểm tra lại các bước extract-batch")
+        sys.exit(1)
 
     # Normalize
     run_id = os.getenv("GITHUB_RUN_ID", datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S"))
