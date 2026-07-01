@@ -122,3 +122,69 @@ class OrionsArmScraper:
 
         logger.info(f"OrionsArm tổng cộng: {len(articles)} bài")
         return articles
+
+    # ------------------------------------------------------------------
+    # PHẦN 2: Incremental — chỉ lấy bài mới/sửa đổi sau since_iso
+    # ------------------------------------------------------------------
+
+    def get_touched_timestamps(self, titles: list[str]) -> dict:
+        """Trả về {title: touched_iso} bằng prop=info, gộp 50 title/call."""
+        result = {}
+        for i in range(0, len(titles), 50):
+            chunk = titles[i:i + 50]
+            params = {
+                "action": "query",
+                "prop": "info",
+                "titles": "|".join(chunk),
+                "format": "json",
+            }
+            try:
+                resp = self.session.get(self.api_url, params=params, timeout=30)
+                resp.raise_for_status()
+                data = resp.json()
+                pages = data.get("query", {}).get("pages", {})
+                for page in pages.values():
+                    title = page.get("title")
+                    touched = page.get("touched")
+                    if title and touched:
+                        result[title] = touched
+            except Exception as e:
+                logger.error(f"OrionsArm - Lỗi lấy touched timestamp: {e}")
+            time.sleep(self.delay)
+        return result
+
+    def scrape_recent(self, since_iso: str) -> list[dict]:
+        """
+        Chỉ cào bài viết được sửa đổi sau thời điểm since_iso (ISO 8601, UTC).
+        Dùng cho Phần 2 - monthly refresh.
+        """
+        articles = []
+        seen_titles: set[str] = set()
+
+        for category in settings.ORIONS_ARM_CATEGORIES:
+            titles = self.get_category_members(category)
+            new_titles = [t for t in titles if t not in seen_titles]
+            seen_titles.update(new_titles)
+
+            if not new_titles:
+                continue
+
+            touched_map = self.get_touched_timestamps(new_titles)
+            changed_titles = [
+                t for t in new_titles
+                if touched_map.get(t, "") > since_iso
+            ]
+            logger.info(
+                f"OrionsArm - '{category}': {len(changed_titles)}/{len(new_titles)} "
+                f"bài thay đổi sau {since_iso}"
+            )
+
+            for title in changed_titles:
+                article = self.get_page_content(title)
+                if article:
+                    articles.append(article)
+                time.sleep(self.delay)
+
+        logger.info(f"OrionsArm (recent) tổng cộng: {len(articles)} bài mới/sửa")
+        return articles
+

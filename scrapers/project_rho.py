@@ -2,6 +2,7 @@
 ProjectRhoScraper - HTML scraping
 Cào bảng dữ liệu và đoạn văn từ Project Rho
 """
+import hashlib
 import requests
 import time
 import logging
@@ -118,3 +119,46 @@ class ProjectRhoScraper:
 
         logger.info(f"ProjectRho tổng cộng: {len(all_articles)} mục")
         return all_articles
+
+    # ------------------------------------------------------------------
+    # PHẦN 2: Incremental — Project Rho không có API nên dùng content-hash
+    # để phát hiện trang nào đã thay đổi kể từ lần cào trước.
+    # ------------------------------------------------------------------
+
+    def _page_hash(self, page_name: str) -> str | None:
+        url = self.base_url + page_name
+        try:
+            resp = self.session.get(url, timeout=30)
+            resp.raise_for_status()
+            return hashlib.md5(resp.text.encode("utf-8")).hexdigest()
+        except Exception as e:
+            logger.error(f"ProjectRho - Lỗi hash '{page_name}': {e}")
+            return None
+
+    def scrape_recent(self, previous_hashes: dict) -> tuple[list[dict], dict]:
+        """
+        So sánh hash nội dung trang với lần cào trước (previous_hashes).
+        Trang nào hash thay đổi (hoặc chưa từng cào) thì cào lại toàn bộ trang đó.
+        Trả về (articles_mới, new_hashes) để lưu lại cho lần sau.
+        """
+        all_articles = []
+        new_hashes = dict(previous_hashes)
+
+        for page in settings.PROJECT_RHO_PAGES:
+            current_hash = self._page_hash(page)
+            if current_hash is None:
+                continue
+
+            if previous_hashes.get(page) == current_hash:
+                logger.info(f"ProjectRho - '{page}': không đổi, bỏ qua")
+                time.sleep(self.delay)
+                continue
+
+            logger.info(f"ProjectRho - '{page}': nội dung thay đổi, cào lại")
+            articles = self.scrape_page(page)
+            all_articles.extend(articles)
+            new_hashes[page] = current_hash
+            time.sleep(self.delay)
+
+        logger.info(f"ProjectRho (recent) tổng cộng: {len(all_articles)} mục thay đổi")
+        return all_articles, new_hashes
