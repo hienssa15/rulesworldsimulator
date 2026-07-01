@@ -30,7 +30,7 @@ class T4Deduplicate:
         logger.info("🔍 T4: DEDUPLICATE")
         logger.info("=" * 80)
         
-        if not self.db:
+        if self.db is None:
             logger.warning("Không có MongoDB, bỏ qua deduplication")
             return normalized_data
         
@@ -65,7 +65,7 @@ class T4Deduplicate:
 
     def save_links(self, links: list[dict], run_id: str):
         """Lưu links đã cào vào MongoDB"""
-        if not self.db:
+        if self.db is None:
             return
         
         try:
@@ -83,7 +83,7 @@ class T4Deduplicate:
 
     def save_content(self, contents: list[dict], run_id: str):
         """Lưu nội dung vào MongoDB"""
-        if not self.db:
+        if self.db is None:
             return
         
         try:
