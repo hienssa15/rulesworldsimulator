@@ -1,0 +1,50 @@
+{
+  "engines": [
+    {
+      "name": "Startpage",
+      "url_template": "https://www.startpage.com/sp/search",
+      "method": "POST",
+      "body_template": "query={query}&cat=web",
+      "link_selector": "a.w-gl__result-url",
+      "exclude_domain_in_href": "startpage.com",
+      "priority": 1
+    },
+    {
+      "name": "Brave",
+      "url_template": "https://search.brave.com/search?q={query}",
+      "method": "GET",
+      "link_selector": "div.snippet a",
+      "exclude_domain_in_href": "brave.com",
+      "priority": 2
+    },
+    {
+      "name": "DuckDuckGo",
+      "url_template": "https://html.duckduckgo.com/html/?q={query}",
+      "method": "GET",
+      "link_selector": "a.result__a",
+      "exclude_domain_in_href": "duckduckgo.com",
+      "priority": 3
+    },
+    {
+      "name": "Google",
+      "url_template": "https://www.google.com/search?q={query}&num=20",
+      "method": "GET",
+      "link_selector": "div.g a[href]",
+      "exclude_domain_in_href": "google.com",
+      "priority": 4
+    }
+  ],
+  "banned_domains": [
+    "pinterest.com", "instagram.com", "tiktok.com", 
+    "facebook.com", "twitter.com", "x.com",
+    "amazon.com", "ebay.com", "aliexpress.com"
+  ],
+  "priority_sources": [
+    "wikipedia.org", "arxiv.org", "nasa.gov", "esa.int",
+    "nature.com", "science.org", "scientificamerican.com",
+    "space.com", "universetoday.com", "astrobio.net",
+    "phys.org", "sciencedaily.com", "researchgate.net",
+    "academia.edu", "fandom.com", "reddit.com",
+    "stackexchange.com", "scholar.google.com"
+  ]
+}
