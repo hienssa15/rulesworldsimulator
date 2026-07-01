@@ -1,0 +1,87 @@
+name: Rulesworld Scraper Pipeline
+
+on:
+  # Cho phép chạy thủ công
+  workflow_dispatch:
+    inputs:
+      max_loops:
+        description: 'Số vòng Pomodoro tối đa (Mặc định: 8 vòng ~ 5.3 giờ)'
+        required: false
+        default: '8'
+        
+  # Hoặc chạy tự động hàng ngày (tùy chọn bật/tắt)
+  schedule:
+    - cron: '0 2 * * *' # Chạy lúc 2h sáng UTC mỗi ngày
+
+# Cấp quyền ghi để push JSON lên repo
+permissions:
+  contents: write
+
+env:
+  # Lấy token từ GitHub Secrets
+  GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
+  # Nếu dùng MongoDB, thêm secret MONGODB_URI vào repo
+  # MONGODB_URI: ${{ secrets.MONGODB_URI }}
+  PYTHONUNBUFFERED: '1' # Bắt buộc để thấy log realtime trên GitHub Actions
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    # Timeout tối đa của GitHub Actions là 6 giờ cho bản free
+    timeout-minutes: 360 
+    
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_PAT }} # Dùng PAT để checkout tránh bị limit push
+          fetch-depth: 0
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install httpx beautifulsoup4 lxml pymongo pdfplumber
+          # Cài Playwright + Chromium headless
+          pip install playwright
+          playwright install chromium --with-deps
+
+      - name: 🚀 Run Scraper Pipeline
+        run: |
+          # Cấu hình Git trước (dự phòng nếu script có gọi git)
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Chạy pipeline. Truyền max_loops vào để giới hạn thời gian
+          # Mặc định 8 loops = 8 x (25p + 15p) = 320 phút (an toàn trong giới hạn 6h)
+          python main.py --loop
+        env:
+          MAX_LOOPS: ${{ github.event.inputs.max_loops || '8' }}
+
+      - name: 💾 Commit & Push Generated JSON Data
+        if: always() # Luôn chạy bước này kể cả khi scrape bị timeout hoặc lỗi
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          echo "Checking for new JSON files..."
+          
+          # Thêm các thư mục chứa JSON state và data thô
+          git add keyword_states/ data/ blackbook.json || true
+          
+          # Kiểm tra xem có thay đổi gì không
+          if git diff --cached --quiet; then
+            echo "✅ Không có dữ liệu JSON mới để push."
+          else
+            echo "📝 Đang commit và push dữ liệu mới..."
+            git commit -m "🤖 [Auto] Update scraper data - $(date +'%Y-%m-%d %H:%M UTC')"
+            
+            # Push bằng GITHUB_PAT
+            git push https://x-access-token:${{ secrets.GITHUB_PAT }}@github.com/${{ github.repository }} HEAD:${{ github.ref }}
+            echo "✅ Push thành công!"
+          fi
