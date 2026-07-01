@@ -64,24 +64,27 @@ jobs:
           MAX_LOOPS: ${{ github.event.inputs.max_loops || '8' }}
 
       - name: 💾 Commit & Push Generated JSON Data
-        if: always() # Luôn chạy bước này kể cả khi scrape bị timeout hoặc lỗi
+        if: always() # Luôn chạy bước này kể cả khi scrape bị lỗi
         run: |
+          # Ép chuyển về thư mục gốc của GitHub Workspace
+          cd $GITHUB_WORKSPACE
+          
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          echo "Checking for new JSON files..."
+          echo "📂 Đang kiểm tra thay đổi trong: $(pwd)"
           
-          # Thêm các thư mục chứa JSON state và data thô
-          git add keyword_states/ data/ blackbook.json || true
+          # Thêm các file/thư mục cần commit (bỏ qua lỗi nếu chưa tồn tại)
+          git add keyword_states/ data/ blackbook.json 2>/dev/null || true
           
-          # Kiểm tra xem có thay đổi gì không
-          if git diff --cached --quiet; then
-            echo "✅ Không có dữ liệu JSON mới để push."
-          else
-            echo "📝 Đang commit và push dữ liệu mới..."
+          # Dùng git status --porcelain để kiểm tra có file nào cần commit không
+          if git status --porcelain | grep -qE '^[MADRC]'; then
+            echo "📝 Phát hiện dữ liệu mới, đang commit..."
             git commit -m "🤖 [Auto] Update scraper data - $(date +'%Y-%m-%d %H:%M UTC')"
             
             # Push bằng GITHUB_PAT
-            git push https://x-access-token:${{ secrets.GITHUB_PAT }}@github.com/${{ github.repository }} HEAD:${{ github.ref }}
+            git push "https://x-access-token:${{ secrets.GITHUB_PAT }}@github.com/${{ github.repository }}" "HEAD:${{ github.ref }}"
             echo "✅ Push thành công!"
+          else
+            echo "✅ Không có dữ liệu JSON mới để push."
           fi
